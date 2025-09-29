@@ -1,0 +1,340 @@
+<meta name='viewport' content='width=device-width, initial-scale=1'/><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>TURBO FINANCE - EMI Agreement</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; background: #f4f9ff; margin: 0; padding: 0; color: #222; }
+    header { background: #1e3c96; color: #fff; padding: 15px; text-align: center; font-size: 20px; font-weight: bold; }
+    form { max-width: 900px; margin: 20px auto; background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
+    h3 { background: #1e3c96; color: #fff; padding: 8px; border-radius: 6px; font-size: 16px; }
+    label { display: block; margin: 10px 0 5px; font-weight: bold; color: #1e3c96; }
+    input, select, textarea { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    textarea { resize: vertical; }
+    .row { display: flex; gap: 15px; }
+    .row .col { flex: 1; }
+    .signature-box { border: 1px dashed #1e3c96; height: 200px; margin-top: 5px; cursor: crosshair; width: 100%; }
+
+    .save-btn {
+      width: 100%;
+      max-width: 400px;
+      padding: 15px;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      background: linear-gradient(90deg, #1e3c96, #3f72ff);
+      color: #fff;
+      transition: background 0.3s ease;
+    }
+    .save-btn:hover { background: linear-gradient(90deg, #142768, #2b57d6); }
+  </style>
+</head>
+<body>
+  <header>TURBO FINANCE - EMI AGREEMENT FORM</header>
+
+  <form id="agreementForm">
+    <h3>Agreement & Customer Details</h3>
+    <div class="row">
+      <div class="col"><label>Agreement Date</label><input type="date" id="agreementDate" required></div>
+      <div class="col"><label>Customer Name</label><input type="text" id="customerName" required></div>
+      <div class="col"><label>Customer Mobile</label><input type="tel" id="customerMobile" maxlength="10" pattern="[0-9]{10}" required></div>
+    </div>
+    <label>Aadhaar</label><input type="text" id="aadhaar">
+    <label>PAN</label><input type="text" id="pan">
+    <label>Work Name</label><input type="text" id="workName">
+    <label>Work Address</label><textarea id="workAddress"></textarea>
+    <label>Home Address</label><textarea id="homeAddress"></textarea>
+
+    <h3>References (Mandatory)</h3>
+    <div class="row">
+      <div class="col"><label>Ref 1 Name</label><input type="text" id="ref1Name" required></div>
+      <div class="col"><label>Ref 1 Mobile</label><input type="tel" id="ref1Mobile" maxlength="10" pattern="[0-9]{10}" required></div>
+    </div>
+    <div class="row">
+      <div class="col"><label>Ref 2 Name</label><input type="text" id="ref2Name" required></div>
+      <div class="col"><label>Ref 2 Mobile</label><input type="tel" id="ref2Mobile" maxlength="10" pattern="[0-9]{10}" required></div>
+    </div>
+
+    <h3>Product Details</h3>
+    <label>Merchant</label>
+    <select id="merchant">
+      <option value="">--Select--</option>
+      <option value="SHREE SHYAM MOBILE">SHREE SHYAM MOBILE</option>
+      <option value="RGM TELECOM">RGM TELECOM</option>
+      <option value="manual">Other (Manual)</option>
+    </select>
+    <input type="text" id="merchantManual" placeholder="Enter Merchant Name" style="display:none;">
+
+    <label>Mobile Brand</label>
+    <select id="mobileBrand" onchange="toggleBrandInput(this)">
+      <option value="">--Select--</option>
+      <option value="Samsung">Samsung</option><option value="Oppo">Oppo</option>
+      <option value="Vivo">Vivo</option><option value="Realme">Realme</option>
+      <option value="Redmi">Redmi</option><option value="manual">Other (Manual)</option>
+    </select>
+    <input type="text" id="brandManual" placeholder="Enter Brand" style="display:none;">
+    <label>IMEI Number</label><input type="text" id="imei">
+    <div class="row">
+      <div class="col"><label>Price (₹)</label><input type="number" id="price" oninput="calculateLoan()"></div>
+      <div class="col"><label>Down Payment (₹)</label><input type="number" id="downPayment" oninput="calculateLoan()"></div>
+      <div class="col"><label>Interest %</label><input type="number" id="interestRate" oninput="calculateLoan()"></div>
+    </div>
+    <div class="row">
+      <div class="col"><label>Months</label><input type="number" id="months" oninput="calculateLoan()"></div>
+      <div class="col"><label>Loan (₹)</label><input type="text" id="loan" readonly></div>
+      <div class="col"><label>EMI (₹)</label><input type="text" id="emi" readonly></div>
+    </div>
+    <div class="row">
+      <div class="col"><label>First EMI Date</label><input type="date" id="emiDay"></div>
+    </div>
+
+    <h3>Signatures</h3>
+    <label>Customer Signature</label>
+    <canvas id="customerSignature" class="signature-box"></canvas>
+    <button type="button" onclick="clearSignature('customerSignature')">Clear</button>
+    <label>Merchant / Guarantor Signature</label>
+    <canvas id="merchantSignature" class="signature-box"></canvas>
+    <button type="button" onclick="clearSignature('merchantSignature')">Clear</button>
+
+    <div style="text-align:center; margin-top:20px;">
+      <button type="button" class="save-btn" onclick="validateAndGeneratePDF()">Save</button>
+    </div>
+  </form><script>
+function calculateLoan(){
+  let price=+document.getElementById("price").value||0;
+  let down=+document.getElementById("downPayment").value||0;
+  let rate=(+document.getElementById("interestRate").value||0)/100;
+  let months=+document.getElementById("months").value||1;
+  let loan=price-down;
+  let emi=loan*(1+rate)/months;
+  document.getElementById("loan").value=loan.toFixed(2);
+  document.getElementById("emi").value=emi.toFixed(2);
+}
+
+function toggleBrandInput(sel){
+  document.getElementById("brandManual").style.display=sel.value==="manual"?"block":"none";
+}
+
+document.getElementById("merchant").addEventListener("change", function(){
+  document.getElementById("merchantManual").style.display = this.value==="manual" ? "block" : "none";
+});
+
+function clearSignature(id){
+  let c=document.getElementById(id);
+  c.getContext("2d").clearRect(0,0,c.width,c.height);
+}
+
+// ✅ High-res signature pad with stroke fix
+function initSignaturePad(id){
+  let c=document.getElementById(id);
+  function resize(){ 
+    c.width=c.offsetWidth*2; 
+    c.height=c.offsetHeight*2; 
+    let ctx=c.getContext("2d");
+    ctx.scale(2,2); 
+    ctx.lineWidth=2; 
+    ctx.lineCap="round"; 
+    ctx.strokeStyle="#000";   // Black visible stroke
+  }
+  resize();
+  let ctx=c.getContext("2d"), drawing=false;
+  function getX(e){ return (e.touches?e.touches[0].clientX:e.clientX)-c.getBoundingClientRect().left; }
+  function getY(e){ return (e.touches?e.touches[0].clientY:e.clientY)-c.getBoundingClientRect().top; }
+  function start(e){ drawing=true; ctx.beginPath(); ctx.moveTo(getX(e),getY(e)); e.preventDefault(); }
+  function draw(e){ if(!drawing)return; ctx.lineTo(getX(e),getY(e)); ctx.stroke(); e.preventDefault(); }
+  function stop(){ drawing=false; }
+  c.addEventListener("mousedown",start); c.addEventListener("mousemove",draw); c.addEventListener("mouseup",stop); c.addEventListener("mouseout",stop);
+  c.addEventListener("touchstart",start,{passive:false}); c.addEventListener("touchmove",draw,{passive:false}); c.addEventListener("touchend",stop);
+  window.addEventListener("resize",resize);
+}
+
+function validateAndGeneratePDF(){
+  let r1n=document.getElementById("ref1Name").value.trim(),
+      r1m=document.getElementById("ref1Mobile").value.trim();
+  let r2n=document.getElementById("ref2Name").value.trim(),
+      r2m=document.getElementById("ref2Mobile").value.trim();
+  if(!r1n||r1m.length!==10||!r2n||r2m.length!==10){
+    alert("⚠ Both Reference 1 and Reference 2 (Name + valid 10-digit Mobile) are mandatory.");
+    return;
+  }
+  generateLockedPDF();
+}
+
+function generateLockedPDF(){
+  const { jsPDF } = window.jspdf;
+  let pdf = new jsPDF("p","mm","a4");
+  let pageW = pdf.internal.pageSize.getWidth();
+  let margin = 20;
+  let y = 25;
+
+  // === HEADER BAR ===
+  pdf.setFillColor(30,60,150);
+  pdf.rect(0,0,pageW,20,"F");
+  pdf.setFont("helvetica","bold"); pdf.setFontSize(16); pdf.setTextColor(255,255,255);
+  pdf.text("TURBO FINANCE - EMI AGREEMENT", pageW/2, 13, {align:"center"});
+
+  // === Helper: Section Box ===
+  function section(title, lines){
+    pdf.setFillColor(30,60,150);
+    pdf.setTextColor(255,255,255);
+    pdf.roundedRect(margin,y,pageW-margin*2,8,2,2,"F");
+    pdf.setFontSize(12); pdf.text(title, margin+4, y+6);
+    y += 12;
+
+    pdf.setFillColor(245,248,255);
+    pdf.rect(margin,y,pageW-margin*2,lines.length*6+6,"F");
+    pdf.setFont("helvetica","normal"); pdf.setFontSize(11); pdf.setTextColor(0,0,0);
+    lines.forEach(line=>{
+      let wrapped=pdf.splitTextToSize(line,pageW-margin*2-8);
+      wrapped.forEach(w=>{ pdf.text(w, margin+4, y+6); y+=6; });
+    });
+    y+=6;
+  }
+
+  // === Borrower Section ===
+  section("Borrower / Customer Details",[
+    "Agreement Date: "+(document.getElementById("agreementDate").value||"--"),
+    "Customer Name: "+(document.getElementById("customerName").value||"--"),
+    "Customer Mobile: "+(document.getElementById("customerMobile").value||"--"),
+    "Aadhaar: "+(document.getElementById("aadhaar").value||"--"),
+    "PAN: "+(document.getElementById("pan").value||"--"),
+    "Work Name: "+(document.getElementById("workName").value||"--"),
+    "Work Address: "+(document.getElementById("workAddress").value||"--"),
+    "Home Address: "+(document.getElementById("homeAddress").value||"--")
+  ]);
+
+  // === References Section ===
+  section("References",[
+    "Ref 1: "+document.getElementById("ref1Name").value+" ("+document.getElementById("ref1Mobile").value+")",
+    "Ref 2: "+document.getElementById("ref2Name").value+" ("+document.getElementById("ref2Mobile").value+")"
+  ]);
+
+  // === Product Section with bold finance details ===
+  pdf.setFillColor(30,60,150);
+  pdf.setTextColor(255,255,255);
+  pdf.roundedRect(margin,y,pageW-margin*2,8,2,2,"F");
+  pdf.setFont("helvetica","bold"); pdf.setFontSize(12);
+  pdf.text("Product Details", margin+4, y+6);
+  y += 12;
+
+  pdf.setFillColor(245,248,255);
+  pdf.rect(margin,y,pageW-margin*2,50,"F");
+  pdf.setFont("helvetica","normal"); pdf.setFontSize(11); pdf.setTextColor(0,0,0);
+
+  let merchantVal=document.getElementById("merchant").value==="manual"
+    ?document.getElementById("merchantManual").value
+    :document.getElementById("merchant").value;
+  let brand=document.getElementById("mobileBrand").value==="manual"
+    ?document.getElementById("brandManual").value
+    :document.getElementById("mobileBrand").value;
+
+  pdf.text("Merchant: "+merchantVal, margin+4, y+8);
+  pdf.text("Mobile Brand: "+brand, margin+4, y+16);
+  pdf.text("IMEI: "+document.getElementById("imei").value, margin+4, y+24);
+
+  // Bold finance details
+  pdf.setFont("helvetica","bold");
+  pdf.text("Price (₹): "+(document.getElementById("price").value||"--"), margin+4, y+34);
+  pdf.text("Down Payment (₹): "+(document.getElementById("downPayment").value||"--"), margin+80, y+34);
+
+  pdf.text("Loan (₹): "+(document.getElementById("loan").value||"--"), margin+4, y+42);
+  pdf.text("EMI (₹): "+(document.getElementById("emi").value||"--"), margin+80, y+42);
+
+  pdf.text("Tenure (Months): "+(document.getElementById("months").value||"--"), margin+4, y+50);
+  y += 56;// === EMI Table ===
+  let emi=+document.getElementById("emi").value||0;
+  let months=+document.getElementById("months").value||0;
+  let first=document.getElementById("emiDay").value?new Date(document.getElementById("emiDay").value):null;
+
+  pdf.setFillColor(30,60,150); pdf.setTextColor(255,255,255);
+  pdf.roundedRect(margin,y,pageW-margin*2,8,2,2,"F");
+  pdf.text("EMI SCHEDULE", pageW/2, y+6,{align:"center"});
+  y += 12;
+
+  let colW=(pageW-margin*2)/3, rowH=8;
+  pdf.setFillColor(50,90,200); pdf.setTextColor(255,255,255);
+  ["EMI No.","Due Date","Amount (₹)"].forEach((h,i)=>{
+    pdf.rect(margin+i*colW,y,colW,rowH,"F");
+    pdf.text(h,margin+i*colW+colW/2,y+6,{align:"center"});
+  });
+  y += rowH;
+
+  pdf.setFont("helvetica","normal"); pdf.setFontSize(10); pdf.setTextColor(0,0,0);
+  for(let i=0;i<months;i++){
+    let due="--/--/----";
+    if(first){ let d=new Date(first); d.setMonth(d.getMonth()+i); due=d.toLocaleDateString("en-GB"); }
+    if(i%2===0){ pdf.setFillColor(240,245,255); pdf.rect(margin,y,colW*3,rowH,"F"); }
+    pdf.setDrawColor(200);
+    for(let j=0;j<3;j++){ pdf.rect(margin+j*colW,y,colW,rowH); }
+    pdf.text((i+1).toString(),margin+colW/2,y+6,{align:"center"});
+    pdf.text(due,margin+colW+colW/2,y+6,{align:"center"});
+    pdf.text("₹ "+emi.toFixed(2),margin+2*colW+colW/2,y+6,{align:"center"});
+    y+=rowH;
+  }
+  pdf.setFillColor(220); pdf.rect(margin,y,colW*3,rowH,"F");
+  pdf.setFont("helvetica","bold");
+  pdf.text("TOTAL",margin+colW/2,y+6,{align:"center"});
+  pdf.text("--",margin+colW+colW/2,y+6,{align:"center"});
+  pdf.text("₹ "+(emi*months).toFixed(2),margin+2*colW+colW/2,y+6,{align:"center"});
+  y += rowH+12;
+
+  // === Penalty ===
+  pdf.setFont("helvetica","bolditalic"); 
+  pdf.setFontSize(11); 
+  pdf.setTextColor(200,0,0);
+  pdf.text("⚠ If customer does not pay on time, penalty ₹590 will be charged.", margin, y);
+  y+=20;
+
+  // === Signatures ===
+  pdf.setFont("helvetica","bold"); 
+  pdf.setFontSize(12); 
+  pdf.setTextColor(30,60,150);
+  pdf.text("Signatures", margin, y); 
+  y+=10;
+
+  pdf.setDrawColor(150);
+  pdf.line(margin,y+40,margin+70,y+40); 
+  pdf.line(pageW/2,y+40,pageW/2+70,y+40);
+
+  pdf.setFont("helvetica","normal"); 
+  pdf.setFontSize(10); 
+  pdf.setTextColor(0,0,0);
+  pdf.text("Customer", margin+35, y+45,{align:"center"});
+  pdf.text("Merchant / Guarantor", pageW/2+35, y+45,{align:"center"});
+
+  function addSig(id,x,y){
+    let c=document.getElementById(id);
+    if(c){
+      let img=c.toDataURL("image/png");
+      if(img.length > 5000){ // ensure signature not blank
+        pdf.addImage(img,"PNG",x,y,70,35);
+      }
+    }
+  }
+  addSig("customerSignature", margin, y);
+  addSig("merchantSignature", pageW/2, y);
+
+  // === Watermark ===
+  pdf.setFont("helvetica","bold"); 
+  pdf.setFontSize(30); 
+  pdf.setTextColor(220);
+  pdf.text("TURBO FINANCE", pageW/2, 290,{align:"center"});
+
+  // === Save ===
+  let name=document.getElementById("customerName").value||"Customer";
+  let dateVal=document.getElementById("agreementDate").value;
+  let dateObj=dateVal?new Date(dateVal):new Date();
+  let dstr=("0"+dateObj.getDate()).slice(-2)+"-"+("0"+(dateObj.getMonth()+1)).slice(-2)+"-"+dateObj.getFullYear();
+  pdf.save(name.replace(/\s+/g,"").toUpperCase()+"_"+dstr+".pdf");
+}
+
+window.onload=function(){
+  initSignaturePad("customerSignature");
+  initSignaturePad("merchantSignature");
+};
+</script>
+</body>
+</html>
